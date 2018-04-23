@@ -1,35 +1,32 @@
 import math
-from queue import PriorityQueue
 import heapq
-import wikipediaapi
+#import wikipediaapi
 import time
-
-visited = set()
-wiki= wikipediaapi.Wikipedia('en')
+import wptools as wiki
 
 #FUNCTIONS
 
-#Get a random wikipedia article
-def getRandomArticle():
-    article = None
-    while article is None:
-        try:
-            article = wiki.page(wiki.random(pages=1))
-        except:
-            pass
-    return article
+visited = set()
+#wiki= wikipediaapi.Wikipedia('en')
+
 
 #If goal is reached
 def isGoal(pageA,pageB):
-    return pageA.title == pageB.title
+
+    return pageA.data['label'] == pageB.data['label']
+
+
+
+def hueristic(pageA, pageB):
+    return hueristicIs1(pageA,pageB)
 
 
 #TFIDF hueristic
 def hueristicIs1(pageA, pageB):
-    if(pageA.title == pageB.title): return 1000
+    if(pageA.data['label'] == pageB.data['label']): return 1000
 
-    pageASummary = pageA.text
-    pageBSummary = pageB.text
+    pageASummary = pageA.data['extext']
+    pageBSummary = pageB.data['extext']
 
 
     pageASummarySplit = pageASummary.split()
@@ -50,49 +47,54 @@ def hueristicIs1(pageA, pageB):
 
 #Runs astar algorithm
 def astar(start, goal,hueristic):
+    start.get_query()
+    goal.get_query()
+
     t0 = time.time()
     if(isGoal(start,goal)):
         return []
 
 
     pq = []
-    g = {start.title:0}
-    f ={start.title:hueristic(start,goal)}
+    g = {start.data['label']:0}
+    f ={start.data['label']:hueristic(start,goal)}
 
     came_from = {}
 
-    heapq.heappush(pq, (f[start.title], start.title))
-    visited.add(start.title)
+    heapq.heappush(pq, (f[start.data['label']], start.data['label']))
+    visited.add(start.data['label'])
 
     while True:
         priority,toplink = heapq.heappop(pq)
-        top = wiki.page(toplink)
-        print(top.links)
-        print(top.title)
+        top = wiki.page(toplink,silent=True)
+        top.get_query()
+        print(top.data['links'])
+        print(top.data['label'])
         if isGoal(top,goal):
             t1 = time.time()
             print("goal reached "+t1-t0)
-            return f[top.title],came_from[top.title]
+            return f[top.data['label']],came_from[top.data['label']]
 
         #Get All Children
-        childnodes = top.links
+        childnodes = top.data['links']
         i = 0
-        for childlink in childnodes.keys():
+        for childlink in childnodes:
             if(childlink not in visited):
                 i+=1
                 visited.add(childlink)
-                if(childlink not in top.text):
+                if(childlink not in top.data['extext']):
                     continue
                 print("Adding Node(Unexplored): "+childlink)
 
-                childpage = childnodes[childlink]
-                g[childpage.title] = g[top.title] + hueristic(top, childpage)
-                f[childpage.title] = g[childpage.title] + hueristic(childpage, goal)
-                heapq.heappush(pq,(f[childpage.title],childpage.title))
+                childpage = wiki.page(childlink,silent=True)
+                childpage.get_query()
+                g[childpage.data['label']] = g[top.data['label']] + hueristic(top, childpage)
+                f[childpage.data['label']] = g[childpage.data['label']] + hueristic(childpage, goal)
+                heapq.heappush(pq,(f[childpage.data['label']],childpage.data['label']))
 
-                came_from[childlink]=top.title
+                came_from[childlink]=top.data['label']
 
-                if(childlink==goal.title):
+                if(childlink==goal.data['label']):
                     return came_from[childlink]
 
         print("queue size: "+str(len(pq)))
@@ -104,18 +106,8 @@ def astar(start, goal,hueristic):
 #main function
 def executeAStar(random=True,pageA=None,pageB=None,userhueristic=hueristicIs1,printResult=True,timeResult=False):
     #Initialize the start and end goal
-    startPage=wiki.page("West Pullman, Chicago")
-    endPage=wiki.page("Economics")
-    if(random):
-        startPage = getRandomArticle()
-        endPage = getRandomArticle()
-        print("start page: " + startPage.title)
-        print("end page: " + endPage.title)
-    elif(not random and pageA!=None and pageB!=None):
-        startPage = pageA
-        endPage = pageB
-    else:
-        print("Invalid parameters!")
+    startPage=wiki.page("West Pullman, Chicago",silent=True)
+    endPage=wiki.page("Economics",silent=True)
 
 
 
@@ -126,6 +118,7 @@ def executeAStar(random=True,pageA=None,pageB=None,userhueristic=hueristicIs1,pr
 
     print("path: \n"+path)
 
-executeAStar(random=False)
+
+executeAStar()
 
 
